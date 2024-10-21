@@ -21,9 +21,7 @@ signals:
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
-
 private:
-    QString sourcePath;
     QFileSystemModel* fsmodel;
 
 

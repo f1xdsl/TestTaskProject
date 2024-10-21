@@ -11,6 +11,7 @@ MainWindow::MainWindow(QWidget *parent)
     comboBoxHLay = new QHBoxLayout(this);
     timerHLay    = new QHBoxLayout(this);
     modVarHLay   = new QHBoxLayout(this);
+    processButtonHLay = new QHBoxLayout(this);
 
 
     browseView          = new QBrowseView(this);
@@ -40,6 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     regex.setPattern("^[0-9A-Fa-f]{1,16}$");
     hexValidator    = new QRegularExpressionValidator(regex,this);
     modVarLineEdit->setValidator(hexValidator);
+    modVarLineEdit->setText("0");
 
 
 
@@ -73,13 +75,18 @@ MainWindow::MainWindow(QWidget *parent)
     modVarHLay->addWidget(modVarLineEdit);
 
     processButton = new QPushButton("Запуск", this);
+    processStopButton = new QPushButton("Стоп", this);
+    processStopButton->setEnabled(false);
 
-    gridLay->addLayout(destHLay,        0,  0,  1,  2);
-    gridLay->addLayout(comboBoxHLay,    1,  1);
-    gridLay->addWidget(deleteBox,       2,  1,  1,  1,  Qt::AlignRight);
-    gridLay->addLayout(timerHLay,       3,  1,  1,  1,  Qt::AlignRight);
-    gridLay->addLayout(modVarHLay,      4,  1,  1,  1,  Qt::AlignRight);
-    gridLay->addWidget(processButton,   5,  1,  1,  1,  Qt::AlignRight);
+    processButtonHLay->addWidget(processButton);
+    processButtonHLay->addWidget(processStopButton);
+
+    gridLay->addLayout(destHLay,            0,  0,  1,  2);
+    gridLay->addLayout(comboBoxHLay,        1,  1);
+    gridLay->addWidget(deleteBox,           2,  1,  1,  1,  Qt::AlignRight);
+    gridLay->addLayout(timerHLay,           3,  1,  1,  1,  Qt::AlignRight);
+    gridLay->addLayout(modVarHLay,          4,  1,  1,  1,  Qt::AlignRight);
+    gridLay->addLayout(processButtonHLay,   5,  1,  1,  1,  Qt::AlignRight);
 
     mainVLay->addLayout(labelHLay);
     mainVLay->addLayout(viewHLay);
@@ -90,6 +97,10 @@ MainWindow::MainWindow(QWidget *parent)
     this->setCentralWidget(centralWidget);
     centralWidget->setLayout(mainVLay);
 
+    processing = false;
+
+    m_timer = new QTimer();
+
 
     connect(browseView, &QBrowseView::selectFile,
             selectedView, &QSelectedView::selectFile);
@@ -97,23 +108,111 @@ MainWindow::MainWindow(QWidget *parent)
     connect(browseDestButton, &QPushButton::clicked, this, &MainWindow::chooseDestPath);
 
     connect(useTimerBox, &QCheckBox::clicked, this, &MainWindow::enableTimer);
+
+    connect(destLineEdit, &QLineEdit::textChanged, this, &MainWindow::changeDestDir);
+
+    connect(modVarLineEdit, &QLineEdit::textChanged, this, &MainWindow::changeModValue);
+
+    connect(processStopButton, &QPushButton::clicked, this, &MainWindow::stopTimer);
+    connect(processButton, &QPushButton::clicked, this, &MainWindow::processFiles);
+
+
+    connect(m_timer, &QTimer::timeout, this, &MainWindow::onTimeout);
+
 }
 
 MainWindow::~MainWindow() {}
 
+void MainWindow::disableAll()
+{
+    browseView->setEnabled(false);
+    selectedView->setEnabled(false);
+    actionComboBox->setEnabled(false);
+    deleteBox->setEnabled(false);
+    useTimerBox->setEnabled(false);
+    timerLineEdit->setEnabled(false);
+    actionComboBox->setEnabled(false);
+    modVarLineEdit->setEnabled(false);
+
+}
+
+void MainWindow::enableAll()
+{
+    browseView->setEnabled(true);
+    selectedView->setEnabled(true);
+    actionComboBox->setEnabled(true);
+    deleteBox->setEnabled(true);
+    useTimerBox->setEnabled(true);
+    actionComboBox->setEnabled(true);
+    modVarLineEdit->setEnabled(true);
+    if(useTimerBox->isChecked())
+        timerLineEdit->setEnabled(true);
+
+}
+
+void MainWindow::onTimeout()
+{
+    processFiles();
+}
+
+void MainWindow::stopTimer()
+{
+
+    m_timer->stop();
+    processButton->setEnabled(true);
+    processStopButton->setEnabled(false);
+    enableAll();
+}
+
+
+void MainWindow::processFiles()
+{
+    if(useTimerBox->isChecked() && !m_timer->isActive()){
+        m_timer->start(timerLineEdit->text().toInt() * 1000);
+        processButton->setEnabled(false);
+        processStopButton->setEnabled(true);
+        disableAll();
+    }
+    bool overwrite = actionComboBox->currentText() == "Перезапись"? true : false;
+    FileProcesser fp = FileProcesser(selectedView->getStringList(), m_destDir, m_value,
+                                     deleteBox->isChecked(), overwrite);
+
+    connect(&fp, &FileProcesser::errorSignal, this, &MainWindow::errorHandler);
+
+    fp.startProcessing();
+
+}
+
 void MainWindow::chooseDestPath()
 {
-    destPath = QFileDialog::getExistingDirectory(this, "Выберите директорию назначения");
+    m_destPath = QFileDialog::getExistingDirectory(this, "Выберите директорию назначения");
 
-    if(!destPath.isEmpty()){
-        destLineEdit->setText(destPath + "/");
+    if(!m_destPath.isEmpty()){
+        destLineEdit->setText(m_destPath);
     }
+}
+
+void MainWindow::changeDestDir(const QString &newText)
+{
+     m_destDir = newText;
+}
+
+void MainWindow::changeModValue(const QString &newText)
+{
+    m_value = QByteArray::fromHex(newText.leftJustified(16, '0').toUtf8());
+
+
 }
 
 void MainWindow::enableTimer(bool enable)
 {
     if(!enable){
-        timerLineEdit->clear();
+        timerLineEdit->setText("0");
     }
     timerLineEdit->setEnabled(enable);
+}
+
+void MainWindow::errorHandler(const QString &msg)
+{
+    QMessageBox::warning(this, "Ошибка", msg);
 }

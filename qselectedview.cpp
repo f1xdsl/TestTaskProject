@@ -9,6 +9,11 @@ QSelectedView::QSelectedView(QWidget* parent) :
 
 QSelectedView::~QSelectedView() {}
 
+QStringList QSelectedView::getStringList()
+{
+    return smodel->stringList();
+}
+
 void QSelectedView::selectFile(const QString fname, const QString fpath){
     QStringList slist = smodel->stringList();
 

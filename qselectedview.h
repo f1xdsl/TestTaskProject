@@ -14,7 +14,7 @@ class QSelectedView : public QListView
 public:
     QSelectedView(QWidget* parent = nullptr);
     ~QSelectedView();
-
+    QStringList getStringList();
 public slots:
     void selectFile(const QString fname, const QString fpath);
 
